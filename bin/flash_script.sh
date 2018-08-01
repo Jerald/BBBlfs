@@ -1,152 +1,151 @@
 #!/bin/bash
 
 diff(){
-	awk 'BEGIN{RS=ORS=" "}
-		{NR==FNR?a[$0]++:a[$0]--}
-		END{for(k in a)if(a[k])print k}' <(echo -n "${!1}") <(echo -n "${!2}")
+    awk 'BEGIN{RS=ORS=" "}
+        {NR==FNR?a[$0]++:a[$0]--}
+        END{for(k in a)if(a[k])print k}' <(echo -n "${!1}") <(echo -n "${!2}")
 }
 
 is_file_exists(){
-	local f="$1"
-	[[ -f "$f" ]] && return 0 || return 1
-}
-
-is_online(){
-	wget -q --tries=5 --timeout=20 http://google.com
-	if [[ $? -eq 0 ]]; then
-		return 0
-	else
-		return 1
-	fi
+    local f="$1"
+    [[ -f "$f" ]] && return 0 || return 1
 }
 
 usage(){
-	echo "Usage: $0 [ debian | ubuntu | input.img.xz ]"
-	echo "Supported images are just in .img.xz format."
-	exit 1
+    echo "Usage: $0 input.img.xz"
+    echo "Supported images are $(tput bold)only$(tput sgr0) in the .img.xz format."
+    exit 1
 }
 
-echo
-input=$1
+# Checking the user did things right
 
-if [[ $# -eq 0 ]]
+if [ "$EUID" -ne 0 ]
 then
-	read -p "You did not provide an image to flash. Do you want me to download the latest Debian image from beagleboard.org? [yY]" -n 1 -r
-	if [[ $REPLY =~ ^[Yy]$ ]]
-	then
-		if ( ! is_online )
-		then
-			echo "You do not have network connectivity!"
-			exit 1
-		fi
-		echo
-		page="$(curl -s -O http://beagleboard.org/latest-images)" 
-		line="$(cat latest-images | grep debian | head -n1)"
-		url="$(echo $line | cut -c7-)"
-		url="${url%?}"
-		rm index.html
-		rm latest-images
-		wget -O flash.img.xz $url
-		input="flash.img.xz"
-	fi
+    echo "Please run as root! (aka, with sudo)"
+    exit 1
+fi
+
+if ( ! is_file_exists usb_flasher)
+then
+    echo "Please make the project before you execute this script!"
+    exit 1
+fi
+
+if [[ $# -ne 1 ]]
+then
+    echo "You did not provide an image to flash! This script must be ran with an image as the first (and only) argument."
+    exit 1
 else
-	input=$1
+    input=$1
 fi
 
-if [ ! \( "$input" = "debian" -o "$input" = "ubuntu" \) ]
+if ( ! is_file_exists "$input" )
 then
-
-	if ( ! is_file_exists "$input" )
-	then
-		echo "Please provide an existing flash file."
-		usage
-		exit 1
-	fi
-
-	echo "We are flashing this all mighty BeagleBone Black with the image from $input!"
-
+    echo "Your image doesn't exist! Please provide a real file to flash."
+    usage
+    exit 1
 fi
-echo "Please do not insert any USB Sticks"\
-		"or mount external hdd during the procedure."
+
+# Actually starting to do stuff
+echo
+echo "We're going to flash your BeagleBone with the image from $input"
+echo "Please do not insert any USB Sticks or mount external drives during the procedure or bad things may happen."
+
+echo
+read -sp "When the BeagleBone is connected in USB Boot mode press [y/n]" -n 1 -r
+
+# Stopping if they didn't input a "y" (case insensitive)
+if ( ! [[ $REPLY =~ ^[Yy]$ ]])
+then
+    echo
+    exit 0
+fi
+
+# An array of all the drives before we start
+before=($(ls /dev | grep "sd[a-z]$"))
+
+echo
+echo "Putting the BeagleBone into flashing mode! (You can ignore any libusb errors)"
+
+# Use the usb_flasher program to put the board into usb flashing mode
+echo
+./usb_flasher
+rc=$?
+
+# Check the return code from the usb_flasher to make sure it completed correctly
+if [[ $rc != 0 ]];
+then
+    echo "The BeagleBone cannot be put in USB Flashing mode! Something has gone horribly wrong. Please try again and hope for the best..."
+    exit $rc
+fi
+
+echo "BeagleBone has been put into flashing mode!"
+
+# It takes exactly 12 seconds for this to complete. every. single. time. I have a feeling there's something making that true...
+echo -n "Now waiting for the BeagleBone to be mounted"
+for i in {1..12}
+do
+    echo -n "."
+    sleep 1
+done
 echo 
 
-read -p "When the BeagleBone Black is connected in USB Boot mode press [yY]." -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]
+# Get the drives after flashing and figure out what the new one is
+# This is why you can't mount anything new while it's running.
+after=($(ls /dev | grep "sd[a-z]$"))
+bbb=($(diff after[@] before[@]))
+
+if [ -z "$bbb" ];
 then
-	before=($(ls /dev | grep "sd[a-z]$"))
-
-	if ( ! is_file_exists usb_flasher)
-	then
-		echo "Please make the project then execute the script!"
-		exit 1
-	fi
-
-	echo
-	echo "Putting the BeagleBone Black into flashing mode!"
-	echo
-
-	sudo ./usb_flasher
-	rc=$?
-	if [[ $rc != 0 ]];
-	then
-		echo "The BeagleBone Black cannot be put in USB Flasing mode. Send "\
-				"logs to vvu@vdev.ro together with the serial output from the"\
-				"BeagleBone Black."
-		exit $rc
-	fi
-
-	echo -n "Waiting for the BeagleBone Black to be mounted"
-	for i in {1..12}
-	do
-		echo -n "."
-		sleep 1
-	done
-	echo 
-
-	after=($(ls /dev | grep "sd[a-z]$"))
-	bbb=($(diff after[@] before[@]))
-	
-	if [ -z "$bbb" ];
-	then
-		echo "The BeagleBone Black cannot be detected. Either it has not been"\
-				" mounted or the g_mass_storage module failed loading. "\
-				"Please send the serial log over to vvu@vdev.ro for debugging."
-		exit 1
-	fi
-	
-	if [ ${#bbb[@]} != "1" ]
-	then
-		echo "You inserted an USB stick or mounted an external drive. Please "\
-			"rerun the script without doing that."
-		exit 1
-	fi
-
-	read -p "Are you sure the BeagleBone Black is mounted at /dev/$bbb?[yY]" -n 1 -r
-	echo
-
-	if [[ $REPLY =~ ^[Yy]$ ]];
-		parts=($(ls /dev | grep "$bbb[1,2]"))
-		then
-			for index in ${!parts[*]}
-			do
-				sudo umount /dev/${parts[$index]}
-		done
-		echo "Flashing now, be patient. It will take ~5 minutes!"
-		echo
-		if [ \( "$input" = "debian" -o "$input" = "ubuntu" \) ]
-		then
-			sudo ./bbb-armhf.sh $bbb $input
-		else
-			xzcat $input | sudo dd of=/dev/$bbb bs=1M
-			echo
-			echo "Resizing partitons now, just as a saefty measure if you flash 2GB image on 4GB board!"
-			echo -e "d\n2\nn\np\n2\n\n\nw" | sudo fdisk /dev/$bbb > /dev/null
-		fi
-		sudo e2fsck -f /dev/${bbb}2
-		sudo resize2fs /dev/${bbb}2
-		echo
-        echo "Please remove power from your board and plug it again."\
-				"You will boot in the new OS!"
-	fi
+    echo "The BeagleBone cannot be detected. Most likely there was an issue mounting it."
+    echo "Please try the program again."
+    exit 1
 fi
+
+echo "Mounted Beaglebone detected!"
+
+echo
+if [ ${#bbb[@]} != "1" ]
+then
+    echo "You inserted an USB stick or mounted an external drive. Please rerun the script without doing that."
+    exit 1
+fi
+
+echo "Are you sure the BeagleBone is mounted at /dev/$bbb? If not, see the troubleshooting tips in the guide."
+read -sp "Run the 'df' command to confirm [y/n]" -n 1
+
+if ( ! [[ $REPLY =~ ^[Yy]$ ]] )
+then
+    echo
+    exit
+fi
+
+# Any of the partitions of the Beaglebone that were mounted
+parts=($(ls /dev | grep "$bbb[1,2]"))
+
+echo
+for index in ${!parts[*]}
+do
+    # Lazy unmounting of said partitions
+    # This means it'll remove them now, but wait until it's not busy to actually unmount it
+    umount -l /dev/${parts[$index]}
+done
+
+# Wait to help make sure they actually unmount
+sleep 3
+
+echo "Flashing now! Be patient, it will take 5 - 8 minutes!"
+
+# Use xz to uncompress the image then pipe that into dd which writes it to the board
+xzcat $input -v | dd of=/dev/$bbb bs=1M
+sleep 1
+
+echo
+echo "Checking file system for errors..."
+e2fsck -f /dev/${bbb}1
+
+echo
+echo "Resizing file system (just in case!). Likely to say nothing needs to happen."
+resize2fs /dev/${bbb}1
+
+echo "Flashing all complete!"
