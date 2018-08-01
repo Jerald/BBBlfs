@@ -1,16 +1,16 @@
-BBBlfs
-======
-[![Build Status](https://travis-ci.org/ungureanuvladvictor/BBBlfs.svg?branch=master)](https://travis-ci.org/ungureanuvladvictor/BBBlfs)
+#beaglebone_usb_flasher
+#### A full system to flash a BeagleBone over usb.
+---
 
-Beagle Bone Black Linux Flash System
+This system is forked from the [BBBlfs](https://github.com/ungureanuvladvictor/BBBlfs) project. Without his work this likely wouldn't be here. 
+Albeit a lot of it was broken and has to be re-engineered... But still his work was the base.
 
-This project provides a way to flash a BeagleBone Black via USB from a Linux machine. The project was developed during Google Summer of Code '13.
 
+##Build
+You need to build the project to create a small executable used to put the BeagleBone into the correct mode to be flashed over usb.
 
-Build
-----------
+It requires `libusb` and `automake` as dependencies. Download them on your favourite package manager. After that, run the below commands to make the executable:
 ```
-sudo apt-get install libusb-1.0-0-dev automake
 ./autogen.sh
 ./configure
 make
