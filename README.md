@@ -1,4 +1,4 @@
-#beaglebone_usb_flasher
+# beaglebone_usb_flasher
 #### A full system to flash a BeagleBone over usb.
 ---
 
@@ -6,37 +6,31 @@ This system is forked from the [BBBlfs](https://github.com/ungureanuvladvictor/B
 Albeit a lot of it was broken and has to be re-engineered... But still his work was the base.
 
 
-##Build
+## Build
+
 You need to build the project to create a small executable used to put the BeagleBone into the correct mode to be flashed over usb.
 
 It requires `libusb` and `automake` as dependencies. Download them on your favourite package manager. After that, run the below commands to make the executable:
-```
+```bash
 ./autogen.sh
 ./configure
 make
 ```
 
+## Usage
 
-Usage
------------
-Press the S2 button on the BeagleBone Black and apply power to the board. The board should start now into USB boot mode.
+Press the S2 button on the BeagleBone and apply power to the board. That's the small button on the opposite side as the ethernet port. The board should now start into USB boot mode.
 
-Connect the board to the host PC. The kernel should now identify your board as an RNDIS interface. Be sure you do not have any BOOTP servers on your network.
+Connect your BeagleBone to the host PC, the kernel will identify the board as an RNDIS interface. Which is to say, a bare-bones ethernet interface. 
 
-Go to bin/ and execute ```flash_script.sh``` It needs the flashing image as argument to be provided.
+<!-- Be sure you do not have any BOOTP servers on your network. -->
 
-For now only .xz compressed images are supported.
+Navigate to the repo's `bin/` folder and execute `flash_script.sh` **as root**. The first argument should be the image you want to flash. For now only .xz compressed images are supported.
 
-```sudo ./flash_script.sh  [ debian | ubuntu | image.xz ]```
-
-* debian and ubuntu will use tarball from armhf.com website
-
-If there are bugs please feel free to contact me.
+For example: `sudo ./flash_script.sh  image.img.xz`
 
 
-
-How to build the binary blobs
---------------------------------
+## How to build the binary blobs
 
 The full system works as follow:
 
@@ -125,8 +119,3 @@ cp /path/to/kernel/arch/arm/boot/dts/am335x-boneblack.dtb .
 mkimage -f maker.its FIT
 ```
 * At this point we have all things put into place. You need to copy the binary blobs in the bin/ folder and run ```flash_script.sh```
-
-#Contact
-vvu@vdev.ro
-
-vvu on #beagle, #beagle-gsoc
