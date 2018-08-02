@@ -7,7 +7,7 @@ Albeit a lot of it was broken and has to be re-engineered... But still his work 
 
 ## Build
 
-You need to build the project to create a small executable used to put the BeagleBone into the correct mode to be flashed over usb.
+You need to build the project to create a small executable used to put the BeagleBone into the correct mode to be flashed over USB.
 
 It requires `libusb` and `automake` as dependencies. Download them with your favourite package manager. After that, run the below commands to make the executable:
 ```bash
