@@ -14,7 +14,11 @@ is_file_exists(){
 usage(){
     echo "Usage: $0 input.img.xz"
     echo "Supported images are $(tput bold)only$(tput sgr0) in the .img.xz format."
-    exit 1
+}
+
+timestamp()
+{
+   echo $(date +"%T")
 }
 
 # Checking the user did things right
@@ -33,10 +37,14 @@ fi
 
 if [[ $# -ne 1 ]]
 then
-    echo "You did not provide an image to flash! This script must be ran with an image as the first (and only) argument."
+    echo "You called the script with the wrong number of arguments. Please try again."
+    echo
+    usage
+    echo
     exit 1
 else
-    input=$1
+    # Expand out any relative paths
+    input=$(realpath $1)
 fi
 
 if ( ! is_file_exists "$input" )
@@ -49,10 +57,10 @@ fi
 # Actually starting to do stuff
 echo
 echo "We're going to flash your BeagleBone with the image from $input"
-echo "Please do not insert any USB Sticks or mount external drives during the procedure or bad things may happen."
+echo "Please do not insert any USB sticks or mount external drives during the procedure or bad things may happen."
 
 echo
-read -sp "When the BeagleBone is connected in USB Boot mode press [y/n]" -n 1 -r
+read -sp "When the BeagleBone is connected in USB boot mode press [y/n]" -n 1 -r
 
 # Stopping if they didn't input a "y" (case insensitive)
 if ( ! [[ $REPLY =~ ^[Yy]$ ]])
@@ -79,7 +87,7 @@ then
     exit $rc
 fi
 
-echo "BeagleBone has been put into flashing mode!"
+echo "Your BeagleBone has been put into flashing mode!"
 
 # It takes exactly 12 seconds for this to complete. every. single. time. I have a feeling there's something making that true...
 echo -n "Now waiting for the BeagleBone to be mounted"
@@ -111,19 +119,21 @@ then
     exit 1
 fi
 
-echo "Are you sure the BeagleBone is mounted at /dev/$bbb? If not, see the troubleshooting tips in the guide."
-read -sp "Run the 'df' command to confirm [y/n]" -n 1
+# Any of the partitions of the Beaglebone that were mounted
+parts=($(ls /dev | grep "$bbb[1,2]"))
+
+echo "Are you sure the BeagleBone is mounted at /dev/${parts[0]}? If not, see the troubleshooting tips in the guide."
+read -sp "Run the 'df' command and confirm /dev/${parts[0]} is under the left column [y/n]" -n 1
 
 if ( ! [[ $REPLY =~ ^[Yy]$ ]] )
 then
     echo
-    exit
+    exit 1
 fi
 
-# Any of the partitions of the Beaglebone that were mounted
-parts=($(ls /dev | grep "$bbb[1,2]"))
-
 echo
+echo
+# Go through each partition that we found
 for index in ${!parts[*]}
 do
     # Lazy unmounting of said partitions
@@ -134,11 +144,15 @@ done
 # Wait to help make sure they actually unmount
 sleep 3
 
-echo "Flashing now! Be patient, it will take 5 - 8 minutes!"
+echo "Flashing now! Be patient, it will take 5 - 10 minutes!"
 
-# Use xz to uncompress the image then pipe that into dd which writes it to the board
-xzcat $input -v | dd of=/dev/$bbb bs=1M
+# Use xz to decompress the image then pipe it into dd to write to the board
+xz -dc $input | dd of=/dev/$bbb bs=1M status=progress
+
 sleep 1
+
+# Resizing partition via fdisk
+# echo -e "d\nn\np\n1\n8192\n\ny\nw" | fdisk /dev/$bbb >/dev/null
 
 echo
 echo "Checking file system for errors..."
@@ -146,6 +160,6 @@ e2fsck -f /dev/${bbb}1
 
 echo
 echo "Resizing file system (just in case!). Likely to say nothing needs to happen."
-resize2fs /dev/${bbb}1
+resize2fs -p /dev/${bbb}1
 
 echo "Flashing all complete!"
