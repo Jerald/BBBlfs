@@ -30,4 +30,4 @@ For example: `sudo ./flash_script.sh  image.img.xz`
 
 ## Troubleshooting
 
-If you have issues with flashing your board, the script provides some minimal error state information which may help. Otherwise, there is a full guide I've wrote for this process with a dedicated troubleshooting section. Check it out [here](please_give_me_a_link).
+If you have issues with flashing your board, the script provides some minimal error state information which may help. Otherwise, there is a full guide I've wrote for this process with a dedicated troubleshooting section. Check it out [here](https://github.com/Jerald/cmpt433finalproject/blob/master/BeagleBone_USB_Flash_Guide.md#troubleshooting).
